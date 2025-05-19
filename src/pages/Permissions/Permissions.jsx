@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -23,42 +23,95 @@ import {
   Chip,
   IconButton,
   TextField,
-  InputAdornment
+  InputAdornment,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
+import { permissionService, userService, applicationService } from '../../services';
+import { useAuth } from '../../contexts/AuthContextNew';
 
-// Mock data for initial development
-const mockUsers = [
-  { id: 1, name: "Alice", email: "alice@example.com", role: "admin" },
-  { id: 2, name: "Bob", email: "bob@example.com", role: "viewer" },
-  { id: 3, name: "Charlie", email: "charlie@example.com", role: "admin" }
-];
-
-const mockApplications = [
-  { id: 1, name: "HR Portal", description: "Human Resources Management Portal" },
-  { id: 2, name: "CRM System", description: "Customer Relationship Management System" },
-  { id: 3, name: "Analytics Dashboard", description: "Business Intelligence Dashboard" }
-];
-
-const mockPermissions = [
-  { id: 1, userId: 1, appId: 1, permission: "admin" },
-  { id: 2, userId: 1, appId: 2, permission: "admin" },
-  { id: 3, userId: 2, appId: 1, permission: "viewer" },
-  { id: 4, userId: 3, appId: 3, permission: "admin" }
-];
-
-const Permissions = ({ userRole }) => {
-  const [permissions, setPermissions] = useState(mockPermissions);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [selectedApp, setSelectedApp] = useState(null);
+const Permissions = () => {
+  const { currentUser } = useAuth();
+  const [permissions, setPermissions] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedApp, setSelectedApp] = useState('');
   const [permissionType, setPermissionType] = useState('viewer');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    userId: null,
+    appId: null,
+    userName: '',
+    appName: ''
+  });
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch all required data in parallel
+      const [usersData, applicationsData] = await Promise.all([
+        userService.getUsers(),
+        applicationService.getApplications()
+      ]);
+      
+      setUsers(usersData);
+      setApplications(applicationsData);
+      
+      // Now fetch permissions for each user
+      const allPermissions = [];
+      for (const user of usersData) {
+        try {
+          const userPermissions = await permissionService.getUserPermissions(user.id);
+          // Add user info to each permission for easier display
+          userPermissions.forEach(perm => {
+            allPermissions.push({
+              ...perm,
+              userName: user.name,
+              userEmail: user.email
+            });
+          });
+        } catch (err) {
+          console.error(`Error fetching permissions for user ${user.id}:`, err);
+        }
+      }
+      
+      setPermissions(allPermissions);
+      setError(null);
+    } catch (err) {
+      setError('Failed to fetch data. Please try again.');
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -74,71 +127,128 @@ const Permissions = ({ userRole }) => {
     setPage(0);
   };
 
-  // Function to get permission entries with user and app details
-  const getPermissionEntries = () => {
-    return permissions.map(perm => {
-      const user = mockUsers.find(u => u.id === perm.userId);
-      const app = mockApplications.find(a => a.id === perm.appId);
-      return {
-        id: perm.id,
-        userId: perm.userId,
-        appId: perm.appId,
-        permission: perm.permission,
-        userName: user ? user.name : 'Unknown',
-        userEmail: user ? user.email : 'Unknown',
-        appName: app ? app.name : 'Unknown'
-      };
-    }).filter(perm => 
-      perm.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      perm.appName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      perm.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  };
-
-  const handleAddPermission = () => {
+  const handleAddPermission = async () => {
     if (selectedUser && selectedApp) {
-      // Check if permission already exists
-      const existingPermIndex = permissions.findIndex(
-        perm => perm.userId === selectedUser && perm.appId === selectedApp
-      );
-
-      if (existingPermIndex >= 0) {
-        // Update existing permission
-        const updatedPermissions = [...permissions];
-        updatedPermissions[existingPermIndex] = {
-          ...updatedPermissions[existingPermIndex],
-          permission: permissionType
-        };
+      try {
+        await permissionService.setPermission(
+          parseInt(selectedUser), 
+          parseInt(selectedApp), 
+          permissionType
+        );
+        
+        showSnackbar('Permission assigned successfully', 'success');
+        
+        // Refetch permissions for this user to update the table
+        const user = users.find(u => u.id === parseInt(selectedUser));
+        const userPermissions = await permissionService.getUserPermissions(parseInt(selectedUser));
+        
+        // Update permissions state with the new data
+        const updatedPermissions = permissions.filter(p => p.userId !== parseInt(selectedUser));
+        userPermissions.forEach(perm => {
+          updatedPermissions.push({
+            ...perm,
+            userName: user.name,
+            userEmail: user.email
+          });
+        });
+        
         setPermissions(updatedPermissions);
-      } else {
-        // Add new permission
-        const newPermission = {
-          id: permissions.length + 1,
-          userId: selectedUser,
-          appId: selectedApp,
-          permission: permissionType
-        };
-        setPermissions([...permissions, newPermission]);
+        
+        // Reset selection
+        setSelectedUser('');
+        setSelectedApp('');
+        setPermissionType('viewer');
+      } catch (err) {
+        showSnackbar('Failed to assign permission', 'error');
+        console.error('Error assigning permission:', err);
       }
-
-      // Reset selection
-      setSelectedUser(null);
-      setSelectedApp(null);
-      setPermissionType('viewer');
     }
   };
 
-  const handleDeletePermission = (permissionId) => {
-    setPermissions(permissions.filter(perm => perm.id !== permissionId));
+  const openDeleteConfirm = (userId, appId, userName, appName) => {
+    setConfirmDialog({
+      open: true,
+      userId,
+      appId,
+      userName,
+      appName
+    });
+  };
+
+  const handleDeletePermission = async () => {
+    const { userId, appId } = confirmDialog;
+    
+    try {
+      await permissionService.removePermission(userId, appId);
+      
+      // Remove from the permissions list
+      setPermissions(permissions.filter(
+        p => !(p.userId === userId && p.applicationId === appId)
+      ));
+      
+      showSnackbar('Permission removed successfully', 'success');
+    } catch (err) {
+      showSnackbar('Failed to remove permission', 'error');
+      console.error('Error removing permission:', err);
+    } finally {
+      setConfirmDialog({ ...confirmDialog, open: false });
+    }
+  };
+
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  // Function to get permission entries with user and app details
+  const getPermissionEntries = () => {
+    return permissions.filter(perm => {
+      const appName = applications.find(a => a.id === perm.applicationId)?.name || 'Unknown';
+      
+      return (
+        perm.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        appName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        perm.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }).map(perm => {
+      const app = applications.find(a => a.id === perm.applicationId);
+      return {
+        ...perm,
+        appName: app ? app.name : 'Unknown'
+      };
+    });
   };
 
   const permissionEntries = getPermissionEntries();
+  const isAdmin = currentUser?.role === 'admin';
+    console.log("isAdmin" , currentUser?.role , currentUser)
+
+  if (loading && permissions.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom>
         User Permissions
       </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         {/* Form to add/edit permissions */}
@@ -150,15 +260,15 @@ const Permissions = ({ userRole }) => {
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>User</InputLabel>
                 <Select
-                  value={selectedUser || ''}
+                  value={selectedUser}
                   label="User"
                   onChange={(e) => setSelectedUser(e.target.value)}
-                  disabled={userRole !== 'admin'}
+                  disabled={!isAdmin}
                 >
                   <MenuItem value="">
                     <em>Select a user</em>
                   </MenuItem>
-                  {mockUsers.map(user => (
+                  {users.map(user => (
                     <MenuItem key={user.id} value={user.id}>
                       {user.name} ({user.email})
                     </MenuItem>
@@ -169,15 +279,15 @@ const Permissions = ({ userRole }) => {
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>Application</InputLabel>
                 <Select
-                  value={selectedApp || ''}
+                  value={selectedApp}
                   label="Application"
                   onChange={(e) => setSelectedApp(e.target.value)}
-                  disabled={userRole !== 'admin'}
+                  disabled={!isAdmin}
                 >
                   <MenuItem value="">
                     <em>Select an application</em>
                   </MenuItem>
-                  {mockApplications.map(app => (
+                  {applications.map(app => (
                     <MenuItem key={app.id} value={app.id}>
                       {app.name}
                     </MenuItem>
@@ -191,7 +301,7 @@ const Permissions = ({ userRole }) => {
                   value={permissionType}
                   label="Permission"
                   onChange={(e) => setPermissionType(e.target.value)}
-                  disabled={userRole !== 'admin'}
+                  disabled={!isAdmin}
                 >
                   <MenuItem value="viewer">Viewer</MenuItem>
                   <MenuItem value="admin">Admin</MenuItem>
@@ -204,7 +314,7 @@ const Permissions = ({ userRole }) => {
                 fullWidth
                 startIcon={<AddIcon />}
                 onClick={handleAddPermission}
-                disabled={!selectedUser || !selectedApp || userRole !== 'admin'}
+                disabled={!selectedUser || !selectedApp || !isAdmin}
               >
                 Assign Permission
               </Button>
@@ -241,37 +351,50 @@ const Permissions = ({ userRole }) => {
                     <TableCell>Email</TableCell>
                     <TableCell>Application</TableCell>
                     <TableCell>Permission</TableCell>
-                    {userRole === 'admin' && <TableCell>Actions</TableCell>}
+                    {isAdmin && <TableCell>Actions</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {permissionEntries
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{entry.userName}</TableCell>
-                        <TableCell>{entry.userEmail}</TableCell>
-                        <TableCell>{entry.appName}</TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={entry.permission} 
-                            color={entry.permission === 'admin' ? 'primary' : 'default'} 
-                            size="small" 
-                          />
-                        </TableCell>
-                        {userRole === 'admin' && (
+                  {permissionEntries.length > 0 ? (
+                    permissionEntries
+                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                      .map((entry) => (
+                        <TableRow key={`${entry.userId}-${entry.applicationId}`}>
+                          <TableCell>{entry.userName}</TableCell>
+                          <TableCell>{entry.userEmail}</TableCell>
+                          <TableCell>{entry.appName}</TableCell>
                           <TableCell>
-                            <IconButton 
+                            <Chip 
+                              label={entry.permissionType} 
+                              color={entry.permissionType === 'admin' ? 'primary' : 'default'} 
                               size="small" 
-                              color="error" 
-                              onClick={() => handleDeletePermission(entry.id)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                            />
                           </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
+                          {isAdmin && (
+                            <TableCell>
+                              <IconButton 
+                                size="small" 
+                                color="error" 
+                                onClick={() => openDeleteConfirm(
+                                  entry.userId, 
+                                  entry.applicationId,
+                                  entry.userName,
+                                  entry.appName
+                                )}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={isAdmin ? 5 : 4} align="center">
+                        No permissions found
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -288,6 +411,37 @@ const Permissions = ({ userRole }) => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+      >
+        <DialogTitle>Remove Permission</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to remove {confirmDialog.userName}'s permission for the application "{confirmDialog.appName}"?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}>Cancel</Button>
+          <Button onClick={handleDeletePermission} color="error" variant="contained">
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

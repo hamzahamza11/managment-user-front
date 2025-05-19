@@ -11,8 +11,7 @@ import {
   ListItemIcon, 
   ListItemText,
   Box,
-  Switch,
-  FormControlLabel,
+  Chip,
   useTheme,
   useMediaQuery
 } from '@mui/material';
@@ -25,29 +24,31 @@ import {
   ExitToApp as LogoutIcon 
 } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContextNew';
 
-const Navbar = ({ userRole, setUserRole }) => {
+const Navbar = ({ userRole, onLogout }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   const handleDrawerToggle = () => {
     setDrawerOpen(!drawerOpen);
   };
 
-  const handleRoleToggle = () => {
-    setUserRole(userRole === 'admin' ? 'viewer' : 'admin');
-  };
-
   const handleLogout = () => {
-    // Logout logic here
-    navigate('/login');
+    if (onLogout) {
+      onLogout();
+    } else {
+      // Fallback if no onLogout prop provided
+      navigate('/login');
+    }
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Users', icon: <PersonIcon />, path: '/users' },
+    // { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: 'Users', icon: <PersonIcon />, path: '/' },
     { text: 'Applications', icon: <AppsIcon />, path: '/applications' },
     { text: 'Permissions', icon: <VpnKeyIcon />, path: '/permissions' },
   ];
@@ -98,16 +99,11 @@ const Navbar = ({ userRole, setUserRole }) => {
             </Button>
           ))}
           
-          <FormControlLabel
-            control={
-              <Switch 
-                checked={userRole === 'admin'} 
-                onChange={handleRoleToggle}
-                color="secondary"
-              />
-            }
+          <Chip
             label={`Role: ${userRole}`}
-            sx={{ mx: 2, color: 'white' }}
+            color={userRole === 'admin' ? 'secondary' : 'default'}
+            variant="outlined"
+            sx={{ mx: 2, color: 'white', borderColor: 'white' }}
           />
           
           <IconButton color="inherit" onClick={handleLogout} aria-label="logout">

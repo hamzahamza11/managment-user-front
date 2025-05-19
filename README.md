@@ -1,3 +1,116 @@
+# User Management Console
+
+This is a mini administration console for managing users, applications, and permissions.
+
+## Features
+
+- User management (CRUD operations)
+- Application management (CRUD operations)
+- Permission management
+- Role-based access control (admin/viewer)
+- JWT authentication
+
+## Tech Stack
+
+### Frontend
+- React
+- Material UI
+- React Router
+- Axios for API requests
+- JWT for authentication
+
+### Backend
+- Node.js
+- Express
+- JWT for authentication
+- In-memory data store (for demo purposes)
+
+## Installation
+
+### Prerequisites
+- Node.js (v14+)
+- npm or yarn
+
+### Backend Setup
+1. Navigate to the server directory:
+```bash
+cd server
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the server:
+```bash
+npm run dev
+```
+The server will run on http://localhost:4001
+
+### Frontend Setup
+1. Navigate to the root directory and install dependencies:
+```bash
+npm install
+```
+
+2. Start the React application:
+```bash
+npm start
+```
+The application will run on http://localhost:3000
+
+## Usage
+
+1. Login with any email address and password (for demo purposes)
+2. Switch between admin and viewer roles using the toggle in the navbar
+3. Admin users can create, edit, and delete resources
+4. Viewer users can only view resources
+
+## API Endpoints
+
+### Authentication
+- `POST /auth/login` - Authenticate user
+
+### Users
+- `GET /users` - Get all users
+- `GET /users/:id` - Get user by ID
+- `POST /users` - Create a new user
+- `PUT /users/:id` - Update a user
+- `DELETE /users/:id` - Delete a user
+
+### Applications
+- `GET /applications` - Get all applications
+- `GET /applications/:id` - Get application by ID
+- `POST /applications` - Create a new application
+- `PUT /applications/:id` - Update an application
+- `DELETE /applications/:id` - Delete an application
+
+### Permissions
+- `GET /permissions` - Get all permissions
+- `GET /users/:id/permissions` - Get permissions for a user
+- `GET /applications/:id/permissions` - Get permissions for an application
+- `POST /users/:id/permissions` - Create/update user permission
+- `DELETE /permissions/:id` - Delete a permission
+
+## Project Structure
+
+```
+├── public/               # Static files
+├── server/               # Backend server
+│   ├── server.js         # Express server setup
+│   └── package.json      # Backend dependencies
+├── src/
+│   ├── components/       # Reusable UI components
+│   ├── layouts/          # Page layouts
+│   ├── pages/            # Page components
+│   ├── services/         # API services
+│   ├── routes/           # Route configuration
+│   ├── App.js            # Main component
+│   └── index.js          # Entry point
+└── package.json          # Frontend dependencies
+```
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

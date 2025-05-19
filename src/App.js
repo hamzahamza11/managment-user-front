@@ -2,6 +2,7 @@ import React from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import AppRoutes from './routes';
+import { AuthProvider } from './contexts/AuthContextNew';
 import './App.css';
 
 const theme = createTheme({
@@ -27,7 +28,9 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppRoutes />
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </ThemeProvider>
   );
 }

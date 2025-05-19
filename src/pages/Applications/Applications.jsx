@@ -1,14 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+
   TablePagination,
   Button,
   IconButton,
@@ -16,41 +11,62 @@ import {
   InputAdornment,
   Card,
   CardContent,
-  Grid
+  Grid,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  CardMedia,
+  Chip
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
-  Search as SearchIcon,
-  Info as InfoIcon
+  Search as SearchIcon
 } from '@mui/icons-material';
+import { applicationService } from '../../services';
+import { useAuth } from '../../contexts/AuthContextNew';
+import AppForm from '../../components/AppForm';
 
-// Mock data for initial development
-const initialApplications = [
-  {
-    id: 1,
-    name: "HR Portal",
-    description: "Human Resources Management Portal"
-  },
-  {
-    id: 2,
-    name: "CRM System",
-    description: "Customer Relationship Management System"
-  },
-  {
-    id: 3,
-    name: "Analytics Dashboard",
-    description: "Business Intelligence Dashboard"
-  }
-];
-
-const Applications = ({ userRole }) => {
-  const [applications, setApplications] = useState(initialApplications);
+const Applications = () => {
+  const { currentUser } = useAuth();
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(6);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedApp, setSelectedApp] = useState(null);
+  const [openForm, setOpenForm] = useState(false);
+  const [currentApp, setCurrentApp] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, appId: null, appName: '' });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  useEffect(() => {
+    fetchApplications();
+  }, []);
+
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
+      const data = await applicationService.getApplications();
+      setApplications(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to fetch applications');
+      console.error('Error fetching applications:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -66,169 +82,269 @@ const Applications = ({ userRole }) => {
     setPage(0);
   };
 
-  const filteredApplications = applications.filter(app => 
+  const handleOpenForm = (app = null) => {
+    setCurrentApp(app);
+    setOpenForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setOpenForm(false);
+    setCurrentApp(null);
+  };
+
+  const handleOpenDeleteConfirm = (appId, appName) => {
+    setConfirmDelete({ open: true, appId, appName });
+  };
+
+  const handleCloseDeleteConfirm = () => {
+    setConfirmDelete({ open: false, appId: null, appName: '' });
+  };
+
+  const handleSaveApp = async (appData) => {
+    try {
+      let result;
+      
+      if (currentApp) {
+        // Update existing app
+        result = await applicationService.updateApplication(currentApp.id, appData);
+        setApplications(applications.map(app => app.id === currentApp.id ? result : app));
+        showSnackbar('Application updated successfully', 'success');
+      } else {
+        // Create new app
+        result = await applicationService.createApplication(appData);
+        setApplications([...applications, result]);
+        showSnackbar('Application created successfully', 'success');
+      }
+      
+      handleCloseForm();
+    } catch (err) {
+      showSnackbar(err.message || 'Failed to save application', 'error');
+      console.error('Error saving application:', err);
+    }
+  };
+
+  const handleDeleteApp = async () => {
+    const { appId } = confirmDelete;
+    
+    try {
+      await applicationService.deleteApplication(appId);
+      setApplications(applications.filter(app => app.id !== appId));
+      showSnackbar('Application deleted successfully', 'success');
+    } catch (err) {
+      showSnackbar('Failed to delete application', 'error');
+      console.error('Error deleting application:', err);
+    } finally {
+      handleCloseDeleteConfirm();
+    }
+  };
+
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  // Filter applications based on search term
+  const filteredApps = applications.filter(app => 
     app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (app.description && app.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleAddApplication = () => {
-    // To be implemented: Open a modal/form to add a new application
-    console.log("Add application clicked");
-  };
+  if (loading && applications.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  const handleEditApplication = (appId) => {
-    // To be implemented: Open a modal/form to edit the application
-    console.log("Edit application:", appId);
-  };
-
-  const handleDeleteApplication = (appId) => {
-    // To be implemented: Confirm and delete the application
-    console.log("Delete application:", appId);
-  };
-
-  const handleViewDetails = (app) => {
-    setSelectedApp(app);
-  };
-
+  const isAdmin = currentUser?.role === 'admin';
+console.log("isAdmin" , currentUser)
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1">
           Applications
         </Typography>
-        {userRole === 'admin' && (
+        {isAdmin && (
           <Button 
             variant="contained" 
             color="primary" 
             startIcon={<AddIcon />}
-            onClick={handleAddApplication}
+            onClick={() => handleOpenForm()}
           >
             Add Application
           </Button>
         )}
       </Box>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={selectedApp ? 8 : 12}>
-          <Paper sx={{ width: '100%', mb: 2 }}>
-            <Box sx={{ p: 2, display: 'flex', alignItems: 'center' }}>
-              <TextField
-                variant="outlined"
-                size="small"
-                placeholder="Search applications..."
-                value={searchTerm}
-                onChange={handleSearch}
-                sx={{ width: 300 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
-            <TableContainer>
-              <Table aria-label="applications table">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Description</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredApplications
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((app) => (
-                      <TableRow key={app.id}>
-                        <TableCell>{app.id}</TableCell>
-                        <TableCell>{app.name}</TableCell>
-                        <TableCell>{app.description}</TableCell>
-                        <TableCell>
-                          <IconButton 
-                            size="small" 
-                            color="info" 
-                            onClick={() => handleViewDetails(app)}
-                          >
-                            <InfoIcon fontSize="small" />
-                          </IconButton>
-                          {userRole === 'admin' && (
-                            <>
-                              <IconButton 
-                                size="small" 
-                                color="primary" 
-                                onClick={() => handleEditApplication(app.id)}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton 
-                                size="small" 
-                                color="error" 
-                                onClick={() => handleDeleteApplication(app.id)}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={filteredApplications.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Paper>
-        </Grid>
+      <Box sx={{ mb: 2 }}>
+        <TextField
+          variant="outlined"
+          size="small"
+          placeholder="Search applications..."
+          value={searchTerm}
+          onChange={handleSearch}
+          fullWidth
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
 
-        {selectedApp && (
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Application Details
-                </Typography>
-                <Typography variant="subtitle1">
-                  {selectedApp.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  {selectedApp.description}
-                </Typography>
-                
-                <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                  Application ID
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  {selectedApp.id}
-                </Typography>
-                
-                {/* More details can be added here */}
-                
-                <Box sx={{ mt: 2 }}>
-                  <Button 
-                    variant="outlined" 
-                    size="small"
-                    onClick={() => setSelectedApp(null)}
+      {filteredApps.length > 0 ? (
+        <Grid container spacing={3}>
+          {filteredApps
+            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+            .map((app) => (
+              <Grid item xs={12} sm={6} md={4} key={app.id}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <CardMedia
+                    component="div"
+                    sx={{
+                      pt: '56.25%', // 16:9 aspect ratio
+                      backgroundColor: app.color || '#1976d2',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: '2rem',
+                      fontWeight: 'bold'
+                    }}
                   >
-                    Close Details
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
+                    <Typography
+                      variant="h4"
+                      component="div"
+                      sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        color: 'white'
+                      }}
+                    >
+                      {app.name.substring(0, 2).toUpperCase()}
+                    </Typography>
+                  </CardMedia>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Typography gutterBottom variant="h5" component="div">
+                        {app.name}
+                      </Typography>
+                      {isAdmin && (
+                        <Box>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleOpenForm(app)}
+                            sx={{ mr: 1 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleOpenDeleteConfirm(app.id, app.name)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      )}
+                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {app.description || 'No description available'}
+                    </Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Chip 
+                        label={app.category || 'General'} 
+                        size="small" 
+                        sx={{ mr: 1, mb: 1 }} 
+                      />
+                      <Chip 
+                        label={app.url ? 'External' : 'Internal'} 
+                        size="small"
+                        color={app.url ? 'secondary' : 'default'}
+                        sx={{ mb: 1 }} 
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+        </Grid>
+      ) : (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography>No applications found</Typography>
+        </Paper>
+      )}
+
+      <TablePagination
+        component="div"
+        count={filteredApps.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        rowsPerPageOptions={[6, 12, 24]}
+      />
+
+      {/* Application Form Dialog */}
+      <Dialog open={openForm} onClose={handleCloseForm} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {currentApp ? 'Edit Application' : 'Add Application'}
+        </DialogTitle>
+        <DialogContent>
+          <AppForm 
+            initialValues={currentApp || {}} 
+            onSubmit={handleSaveApp} 
+            onCancel={handleCloseForm}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete Dialog */}
+      <Dialog open={confirmDelete.open} onClose={handleCloseDeleteConfirm}>
+        <DialogTitle>Delete Application</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete "{confirmDelete.appName}"? This will also remove all associated permissions.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteConfirm}>Cancel</Button>
+          <Button onClick={handleDeleteApp} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

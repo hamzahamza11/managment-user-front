@@ -6,12 +6,14 @@ import Users from '../pages/Users/Users';
 import Applications from '../pages/Applications/Applications';
 import Permissions from '../pages/Permissions/Permissions';
 import Login from '../pages/Login/Login';
+import { useAuth } from '../contexts/AuthContextNew';
 
 // Private route wrapper component
 const PrivateRoute = () => {
-  const isAuthenticated = localStorage.getItem('isLoggedIn') === 'true';
+  const { currentUser } = useAuth();
+  console.log('PrivateRoute check - isAuthenticated:', !!currentUser);
   
-  return isAuthenticated ? (
+  return currentUser ? (
     <MainLayout>
       <Outlet />
     </MainLayout>
@@ -29,8 +31,8 @@ const AppRoutes = () => {
         
         {/* Protected routes */}
         <Route element={<PrivateRoute />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/users" element={<Users />} />
+          {/* <Route path="/" element={<Dashboard />} /> */}
+          <Route path="/" element={<Users />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/permissions" element={<Permissions />} />
         </Route>

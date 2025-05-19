@@ -1,139 +1,86 @@
-// Mock data for users
-const mockUsers = [
-  {
-    id: 1,
-    name: "Alice",
-    email: "alice@example.com",
-    role: "admin",
-    isActive: true,
-    createdAt: "2024-01-01T12:00:00Z"
-  },
-  {
-    id: 2,
-    name: "Bob",
-    email: "bob@example.com",
-    role: "viewer",
-    isActive: true,
-    createdAt: "2024-01-02T12:00:00Z"
-  },
-  {
-    id: 3,
-    name: "Charlie",
-    email: "charlie@example.com",
-    role: "admin",
-    isActive: false,
-    createdAt: "2024-01-03T12:00:00Z"
-  },
-  {
-    id: 4,
-    name: "David",
-    email: "david@example.com",
-    role: "viewer",
-    isActive: true,
-    createdAt: "2024-01-04T12:00:00Z"
-  },
-  {
-    id: 5,
-    name: "Eve",
-    email: "eve@example.com",
-    role: "admin",
-    isActive: true,
-    createdAt: "2024-01-05T12:00:00Z"
-  }
-];
+import axios from 'axios';
+import { handleApiError } from '../utils/errorHandler';
+import { authHeader } from '../utils/authHeader';
 
-// Store users in localStorage
-if (!localStorage.getItem('users')) {
-  localStorage.setItem('users', JSON.stringify(mockUsers));
-}
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4001';
 
-const userService = {
-  // Get all users
-  getUsers: async () => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        resolve(users);
-      }, 300);
-    });
-  },
-  
-  // Get user by ID
-  getUserById: async (id) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        const user = users.find(u => u.id === id);
-        
-        if (user) {
-          resolve(user);
-        } else {
-          reject(new Error('User not found'));
-        }
-      }, 300);
-    });
-  },
-  
-  // Create a new user
-  createUser: async (userData) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        
-        // Generate a new ID
-        const maxId = users.reduce((max, user) => Math.max(max, user.id), 0);
-        const newUser = {
-          ...userData,
-          id: maxId + 1,
-          createdAt: new Date().toISOString()
-        };
-        
-        // Add to array and save to localStorage
-        users.push(newUser);
-        localStorage.setItem('users', JSON.stringify(users));
-        
-        resolve(newUser);
-      }, 500);
-    });
-  },
-  
-  // Update a user
-  updateUser: async (id, userData) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        const index = users.findIndex(u => u.id === id);
-        
-        if (index !== -1) {
-          // Update user data
-          users[index] = { ...users[index], ...userData };
-          localStorage.setItem('users', JSON.stringify(users));
-          resolve(users[index]);
-        } else {
-          reject(new Error('User not found'));
-        }
-      }, 500);
-    });
-  },
-  
-  // Delete a user
-  deleteUser: async (id) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        const index = users.findIndex(u => u.id === id);
-        
-        if (index !== -1) {
-          // Remove user from array
-          users.splice(index, 1);
-          localStorage.setItem('users', JSON.stringify(users));
-          resolve({ success: true });
-        } else {
-          reject(new Error('User not found'));
-        }
-      }, 500);
-    });
-  }
+export const userService = {
+  getUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  getUserProfile
 };
 
-export default userService; 
+// Get all users
+async function getUsers() {
+  try {
+    const response = await axios.get(`${API_URL}/users`, {
+      headers: authHeader()
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+// Get user by ID
+async function getUserById(id) {
+  try {
+    const response = await axios.get(`${API_URL}/users/${id}`, {
+      headers: authHeader()
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+// Create a new user
+async function createUser(userData) {
+  try {
+    const response = await axios.post(`${API_URL}/users`, userData, {
+      headers: authHeader()
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+// Update a user
+async function updateUser(id, userData) {
+  try {
+    const response = await axios.put(`${API_URL}/users/${id}`, userData, {
+      headers: authHeader()
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+// Delete a user
+async function deleteUser(id) {
+  try {
+    const response = await axios.delete(`${API_URL}/users/${id}`, {
+      headers: authHeader()
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+// Get current user profile
+async function getUserProfile() {
+  try {
+    const response = await axios.get(`${API_URL}/users/profile`, {
+      headers: authHeader()
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+} 
