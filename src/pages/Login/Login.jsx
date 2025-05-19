@@ -185,18 +185,7 @@ const Login = () => {
               disabled={loading}
             />
             
-            <FormControlLabel
-              control={
-                <Switch 
-                  checked={userRole === 'admin'} 
-                  onChange={() => setUserRole(userRole === 'admin' ? 'viewer' : 'admin')}
-                  color="primary"
-                  disabled={loading}
-                />
-              }
-              label={`Login as: ${userRole}`}
-              sx={{ mt: 2 }}
-            />
+            
             
             <Button
               type="submit"
@@ -208,7 +197,7 @@ const Login = () => {
               {loading ? <CircularProgress size={24} /> : 'Login'}
             </Button>
             
-            <Button
+            {/* <Button
               fullWidth
               variant="outlined"
               sx={{ mt: 2, mb: 2 }}
@@ -220,12 +209,12 @@ const Login = () => {
             
             <Typography variant="body2" color="text.secondary" align="center">
               * For the real login to work, your backend must be running.
-            </Typography>
+            </Typography> */}
           </Box>
           
           <Divider sx={{ width: '100%', my: 2 }} />
           
-          <Box sx={{ width: '100%', mt: 2 }}>
+          {/* <Box sx={{ width: '100%', mt: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               Having trouble logging in?
             </Typography>
@@ -249,7 +238,7 @@ const Login = () => {
                 {apiStatus.status}
               </Alert>
             )}
-          </Box>
+          </Box> */}
         </Paper>
       </Box>
     </Container>
